@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手眼協調訓練遊戲</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #target {
+            position: absolute;
+            width: 150px; /* 初始大小 */
+            height: 150px;
+            cursor: pointer;
+            transition: all 0.5s ease; /* 平滑移動與放大 */
+            z-index: 10;
+        }
+
+        /* 麵包超人佔位樣式 (如果有照片可改為 <img>) */
+        .anpanman {
+            background-color: #f00; /* 紅色背景 */
+            border-radius: 50%;
+            border: 5px solid #ffa500;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .anpanman img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 跳動動畫提示 */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+        }
+
+        .hint-bounce {
+            animation: bounce 0.6s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="target" class="anpanman">
+        <span id="placeholder-text" style="color: white; font-weight: bold;">點擊我</span>
+    </div>
+
+    <script>
+        const target = document.getElementById('target');
+        let clickCount = 0;
+        let currentSize = 150;
+        let phase = 'grow'; // grow, move
+        let cornerIndex = 0;
+        let lookTimer;
+        
+        // 預設四個角落的座標 (左上, 右上, 左下, 右下)
+        const corners = [
+            { top: '20px', left: '20px' },
+            { top: '20px', right: '20px' },
+            { bottom: '20px', left: '20px' },
+            { bottom: '20px', right: '20px' }
+        ];
+
+        // 簡單的音效產生器 (叮一聲)
+        function playDing() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 頻率
+            gain.gain.setValueAtTime(0.5, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+        }
+
+        // 處理點擊邏輯
+        target.addEventListener('mousedown', (e) => {
+            if (phase === 'grow') {
+                clickCount++;
+                currentSize += 80; // 每次變大約 2cm (80px)
+                target.style.width = currentSize + 'px';
+                target.style.height = currentSize + 'px';
+                playDing();
+
+                if (clickCount >= 3) {
+                    phase = 'move';
+                    startMovingSequence();
+                }
+            }
+        });
+
+        // 移動邏輯
+        async function startMovingSequence() {
+            // 重置位置到中央
+            target.style.position = 'absolute';
+            
+            for (let i = 0; i < corners.length; i++) {
+                await moveToCorner(i);
+                await new Promise(r => setTimeout(r, 2000)); // 停頓 2 秒
+            }
+
+            // 最後消失
+            target.style.display = 'none';
+            alert("訓練完成！");
+        }
+
+        function moveToCorner(index) {
+            return new Promise((resolve) => {
+                // 清除之前的座標設定
+                target.style.top = 'auto';
+                target.style.bottom = 'auto';
+                target.style.left = 'auto';
+                target.style.right = 'auto';
+                target.classList.remove('hint-bounce');
+
+                // 應用新位置
+                const pos = corners[index];
+                Object.keys(pos).forEach(key => {
+                    target.style[key] = pos[key];
+                });
+
+                // --- 注視邏輯模擬 ---
+                // 這裡使用 mouseover 來模擬眼動儀注視
+                // 如果是配合實體眼動儀，則會接收座標數據判斷是否落在 target 內
+                let gazed = false;
+                
+                const onGaze = () => {
+                    gazed = true;
+                    clearTimeout(lookTimer);
+                    target.classList.remove('hint-bounce');
+                    target.removeEventListener('mouseenter', onGaze);
+                    resolve();
+                };
+
+                target.addEventListener('mouseenter', onGaze);
+
+                // 3秒後未注視則跳動
+                lookTimer = setTimeout(() => {
+                    if (!gazed) {
+                        target.classList.add('hint-bounce');
+                    }
+                }, 3000);
+            });
+        }
+    </script>
+</body>
+</html>
